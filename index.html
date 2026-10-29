@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verdadeiro ou falso?</title>
+<style>
+  :root {
+    --fundo: #14213d;
+    --painel: #1d2f55;
+    --texto: #f1f5f9;
+    --verdadeiro: #2a9d8f;
+    --falso: #c8553d;
+    --destaque: #fcbf49;
+    --tinta: #14213d;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    background: var(--fundo);
+    color: var(--texto);
+    min-height: 100vh;
+    padding: 40px 20px 60px;
+  }
+  header { text-align: center; max-width: 620px; margin: 0 auto 28px; }
+  h1 { font-size: clamp(2rem, 5vw, 3rem); }
+  header p { margin-top: 10px; opacity: .8; line-height: 1.5; }
+
+  /* Painel: placar, progresso e controles */
+  .painel {
+    max-width: 1000px; margin: 0 auto 32px; padding: 18px 22px;
+    background: var(--painel); border-radius: 16px;
+    display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-between;
+  }
+  .placar { font-size: 1.15rem; font-weight: 700; }
+  .placar span { color: var(--destaque); }
+  .barra { flex: 1 1 180px; height: 10px; background: #0d1730; border-radius: 99px; overflow: hidden; }
+  .barra div { height: 100%; width: 0; background: var(--destaque); transition: width .4s; }
+  .filtros, .acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .painel button {
+    font: inherit; font-size: .9rem; cursor: pointer; color: var(--texto);
+    background: transparent; border: 2px solid #3b5086; border-radius: 99px; padding: 6px 14px;
+  }
+  .painel button:hover { border-color: var(--destaque); }
+  .painel button.ativo { background: var(--destaque); color: var(--tinta); border-color: var(--destaque); font-weight: 700; }
+  .painel button:focus-visible, .escolhas button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+  .grade {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 28px; max-width: 1000px; margin: 0 auto;
+  }
+
+  /* Cartão giratório */
+  .cartao { perspective: 1000px; height: 380px; }
+  .interno { position: relative; width: 100%; height: 100%; transition: transform .7s; transform-style: preserve-3d; }
+  .cartao.respondido .interno { transform: rotateY(180deg); }
+
+  .lado {
+    position: absolute; inset: 0; border-radius: 18px; padding: 20px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  }
+  .frente { background: var(--destaque); color: var(--tinta); }
+  .categoria {
+    font-size: .8rem; font-weight: 700; background: var(--tinta); color: var(--destaque);
+    padding: 3px 12px; border-radius: 99px;
+  }
+  .imagem { font-size: 4.2rem; line-height: 1; }
+  .frente img { width: 100%; height: 140px; object-fit: cover; border-radius: 12px; }
+  .frente p { font-size: 1.05rem; font-weight: 700; line-height: 1.35; }
+  .escolhas { display: flex; gap: 10px; width: 100%; }
+  .escolhas button {
+    flex: 1; font: inherit; font-weight: 700; font-size: .95rem; cursor: pointer;
+    border: 0; border-radius: 10px; padding: 10px 6px; color: #fff;
+  }
+  .escolhas .bv { background: var(--verdadeiro); }
+  .escolhas .bf { background: var(--falso); }
+  .escolhas button:hover { filter: brightness(1.12); }
+
+  .verso { transform: rotateY(180deg); color: #fff; }
+  .verso.v { background: var(--verdadeiro); }
+  .verso.f { background: var(--falso); }
+  .verso h2 { font-size: 1.9rem; }
+  .verso p { font-size: .95rem; line-height: 1.5; }
+  .resultado { font-size: .85rem; font-weight: 700; background: rgba(0,0,0,.25); padding: 4px 14px; border-radius: 99px; }
+
+  .fim {
+    max-width: 620px; margin: 36px auto 0; padding: 22px; text-align: center;
+    background: var(--painel); border-radius: 16px; font-size: 1.1rem; line-height: 1.5;
+  }
+  .fim[hidden] { display: none; }
+
+  @media (prefers-reduced-motion: reduce) { .interno, .barra div { transition: none; } }
+  .fonte { text-align: center; margin-top: 24px; font-size: .85rem; opacity: .65; }
+  .status { grid-column: 1 / -1; text-align: center; padding: 40px 0; font-size: 1.1rem; opacity: .85; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Verdadeiro ou falso?</h1>
+  <p>Leia a afirmação e escolha Verdadeiro ou Falso. O cartão só gira depois que você responder.</p>
+</header>
+
+<section class="painel" aria-label="Placar e controles">
+  <div class="placar">Acertos: <span id="acertos">0</span> / <span id="respondidas">0</span></div>
+  <div class="barra" aria-hidden="true"><div id="progresso"></div></div>
+  <div class="filtros" id="filtros"></div>
+  <div class="acoes">
+    <button type="button" id="reiniciar">Novas perguntas</button>
+  </div>
+</section>
+
+<main class="grade" id="grade"></main>
+<div class="fim" id="fim" hidden></div>
+<p class="fonte" id="fonte"></p>
+
+<script>
+  // ====== CONFIGURAÇÃO ======
+  // OPCIONAL (melhor qualidade): cole aqui sua chave gratuita do Google AI Studio (aistudio.google.com).
+  // Com a chave, o Gemini (Google) cria perguntas novas em português, com explicação.
+  // Sem a chave, o site usa o Open Trivia DB e traduz com o Google Tradutor.
+  // Atenção: em site público a chave fica visível; use apenas para testes ou proteja-a no servidor.
+  const CHAVE_GEMINI = "";
+  const MODELO_GEMINI = "gemini-2.0-flash"; // troque se o Google mudar o nome do modelo
+
+  // Plano C, caso a internet falhe:
+  const RESERVA = [
+    { categoria: "Animais", emoji: "🐙", afirmacao: "Polvos têm três corações.", verdadeiro: true, explicacao: "Dois corações levam o sangue às brânquias e um terceiro o distribui pelo corpo." },
+    { categoria: "Ciência", emoji: "⚡", afirmacao: "O raio nunca cai duas vezes no mesmo lugar.", verdadeiro: false, explicacao: "Raios caem várias vezes no mesmo ponto. O Empire State Building é atingido cerca de 20 vezes por ano." },
+    { categoria: "Ciência", emoji: "🍯", afirmacao: "O mel pode durar milhares de anos sem estragar.", verdadeiro: true, explicacao: "Pouca água e alta acidez impedem microrganismos. Já acharam mel comestível em tumbas egípcias." },
+    { categoria: "Corpo humano", emoji: "🧠", afirmacao: "Usamos apenas 10% do cérebro.", verdadeiro: false, explicacao: "Exames de imagem mostram atividade em todas as regiões do cérebro." },
+    { categoria: "História", emoji: "🧱", afirmacao: "A Grande Muralha da China é visível a olho nu do espaço.", verdadeiro: false, explicacao: "Ela é longa, mas muito estreita. Astronautas relatam que não conseguem vê-la sem lentes." },
+    { categoria: "Animais", emoji: "🦈", afirmacao: "Tubarões existem há mais tempo que as árvores.", verdadeiro: true, explicacao: "Os tubarões surgiram há mais de 400 milhões de anos, antes das primeiras florestas." }
+  ];
+  // ==========================
+
+  const QTD = 10;
+  const grade = document.getElementById("grade");
+  const filtros = document.getElementById("filtros");
+  const fim = document.getElementById("fim");
+  const fonte = document.getElementById("fonte");
+  let fatos = [], respostas = {}, filtroAtual = "Todos";
+
+  const EMOJIS = { "Animais": "🐾", "Ciência": "🔬", "Geografia": "🌍", "História": "📜", "Esportes": "⚽",
+    "Cultura": "🎬", "Tecnologia": "💻", "Corpo humano": "🧠", "Geral": "💡" };
+  const CATEGORIAS_TRIVIA = { "General Knowledge": "Geral", "Science & Nature": "Ciência", "Science: Computers": "Tecnologia",
+    "Science: Mathematics": "Ciência", "Geography": "Geografia", "History": "História", "Animals": "Animais",
+    "Sports": "Esportes", "Mythology": "Cultura", "Art": "Cultura", "Entertainment: Film": "Cultura",
+    "Entertainment: Music": "Cultura", "Entertainment: Television": "Cultura", "Entertainment: Video Games": "Cultura" };
+
+  // ---------- Fontes de perguntas ----------
+  async function viaGemini() {
+    const pedido = `Crie ${QTD} afirmações curiosas e surpreendentes em português do Brasil, metade verdadeiras e metade falsas, misturadas.
+Varie os assuntos entre animais, ciência, corpo humano, história, geografia e tecnologia. Semente aleatória: ${Date.now()}.
+Responda só com um array JSON de objetos: {"categoria": string curta, "emoji": um emoji, "afirmacao": string, "verdadeiro": boolean, "explicacao": 1 ou 2 frases}.`;
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELO_GEMINI}:generateContent?key=${CHAVE_GEMINI}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: pedido }] }], generationConfig: { responseMimeType: "application/json", temperature: 1.1 } })
+    });
+    if (!r.ok) throw new Error("Gemini " + r.status);
+    const dados = await r.json();
+    const lista = JSON.parse(dados.candidates[0].content.parts[0].text);
+    return { lista, origem: "Perguntas criadas pelo Gemini (Google)" };
+  }
+
+  async function traduzir(texto) {
+    const r = await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=" + encodeURIComponent(texto));
+    if (!r.ok) throw new Error("Tradutor " + r.status);
+    const d = await r.json();
+    return d[0].map(p => p[0]).join("");
+  }
+
+  let traducaoFalhou = false;
+  async function viaTrivia() {
+    traducaoFalhou = false;
+    const r = await fetch(`https://opentdb.com/api.php?amount=${QTD}&type=boolean&encode=url3986`);
+    if (!r.ok) throw new Error("OpenTDB " + r.status);
+    const d = await r.json();
+    if (d.response_code !== 0) throw new Error("OpenTDB código " + d.response_code);
+    const lista = await Promise.all(d.results.map(async q => {
+      const cat = CATEGORIAS_TRIVIA[decodeURIComponent(q.category)] || "Geral";
+      const verdadeiro = decodeURIComponent(q.correct_answer) === "True";
+      return {
+        categoria: cat, emoji: EMOJIS[cat] || "💡",
+        afirmacao: await traduzir(decodeURIComponent(q.question)).catch(() => { traducaoFalhou = true; return decodeURIComponent(q.question); }),
+        verdadeiro, explicacao: ""
+      };
+    }));
+    return { lista, origem: traducaoFalhou
+      ? "Perguntas do Open Trivia DB (o Google Tradutor não respondeu, então ficaram em inglês)"
+      : "Perguntas do Open Trivia DB, traduzidas pelo Google Tradutor" };
+  }
+
+  async function carregar() {
+    grade.innerHTML = '<p class="status">Buscando novas perguntas…</p>';
+    fim.hidden = true;
+    respostas = {};
+    filtroAtual = "Todos";
+    let resultado, motivo = "";
+    try {
+      resultado = CHAVE_GEMINI ? await viaGemini() : await viaTrivia();
+    } catch (e1) {
+      console.warn("Falha na fonte principal:", e1);
+      motivo = e1.message;
+      try { resultado = CHAVE_GEMINI ? await viaTrivia() : null; } catch (e2) { console.warn(e2); motivo += " / " + e2.message; }
+    }
+    if (!resultado) {
+      const emb = [...RESERVA].sort(() => Math.random() - .5);
+      resultado = { lista: emb, origem: "Não consegui buscar perguntas online (" + motivo + "). Usando as perguntas salvas no site." };
+    }
+    fatos = resultado.lista;
+    fonte.textContent = resultado.origem;
+    criarFiltros();
+    desenhar();
+  }
+
+  // ---------- Interface ----------
+  function visiveis() {
+    return fatos.map((_, i) => i).filter(i => filtroAtual === "Todos" || fatos[i].categoria === filtroAtual);
+  }
+
+  function criarFiltros() {
+    const cats = ["Todos", ...new Set(fatos.map(f => f.categoria))];
+    filtros.innerHTML = "";
+    cats.forEach(c => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = c;
+      b.className = c === filtroAtual ? "ativo" : "";
+      b.onclick = () => { filtroAtual = c; criarFiltros(); desenhar(); };
+      filtros.appendChild(b);
+    });
+  }
+
+  function atualizarPlacar() {
+    const lista = visiveis();
+    const feitas = lista.filter(i => i in respostas);
+    const certas = feitas.filter(i => respostas[i]).length;
+    document.getElementById("acertos").textContent = certas;
+    document.getElementById("respondidas").textContent = feitas.length;
+    document.getElementById("progresso").style.width = (lista.length ? feitas.length / lista.length * 100 : 0) + "%";
+    if (lista.length && feitas.length === lista.length) {
+      const pct = Math.round(certas / lista.length * 100);
+      const msg = pct === 100 ? "Perfeito! Você acertou tudo." : pct >= 60 ? "Muito bem!" : "Dá para melhorar. Que tal tentar de novo?";
+      fim.textContent = `Você acertou ${certas} de ${lista.length} (${pct}%). ${msg} Clique em "Novas perguntas" para jogar outra rodada.`;
+      fim.hidden = false;
+    } else fim.hidden = true;
+  }
+
+  function responder(cartao, i, palpite) {
+    if (i in respostas) return;
+    respostas[i] = palpite === fatos[i].verdadeiro;
+    marcar(cartao, i);
+    atualizarPlacar();
+  }
+
+  function marcar(cartao, i) {
+    cartao.classList.add("respondido");
+    const r = cartao.querySelector(".resultado");
+    r.textContent = respostas[i] ? "🎉 Você acertou!" : "Você errou desta vez";
+    r.hidden = false;
+    cartao.querySelector(".escolhas").hidden = true;
+  }
+
+  function desenhar() {
+    grade.innerHTML = "";
+    visiveis().forEach(i => {
+      const f = fatos[i];
+      const cartao = document.createElement("div");
+      cartao.className = "cartao";
+      cartao.innerHTML = `
+        <div class="interno">
+          <div class="lado frente">
+            <span class="categoria"></span>
+            <div class="imagem" aria-hidden="true"></div>
+            <p></p>
+            <div class="escolhas">
+              <button type="button" class="bv">Verdadeiro</button>
+              <button type="button" class="bf">Falso</button>
+            </div>
+          </div>
+          <div class="lado verso ${f.verdadeiro ? "v" : "f"}">
+            <h2>${f.verdadeiro ? "✅ Verdadeiro" : "❌ Falso"}</h2>
+            <p class="expl"></p>
+            <span class="resultado" hidden></span>
+          </div>
+        </div>`;
+      // textContent evita que texto vindo da internet seja interpretado como HTML
+      cartao.querySelector(".categoria").textContent = f.categoria || "Geral";
+      cartao.querySelector(".imagem").textContent = f.emoji || EMOJIS[f.categoria] || "💡";
+      cartao.querySelector(".frente p").textContent = f.afirmacao;
+      cartao.querySelector(".expl").textContent = f.explicacao || "Resposta confirmada pela fonte das perguntas.";
+      if (i in respostas) marcar(cartao, i);
+      cartao.querySelector(".bv").onclick = () => responder(cartao, i, true);
+      cartao.querySelector(".bf").onclick = () => responder(cartao, i, false);
+      grade.appendChild(cartao);
+    });
+    atualizarPlacar();
+  }
+
+  document.getElementById("reiniciar").onclick = carregar;
+  carregar();
+</script>
+</body>
+</html>
